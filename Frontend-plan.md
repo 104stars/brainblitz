@@ -15,8 +15,7 @@
 - **Autenticación:** Firebase Auth SDK
 - **HTTP Client:** Axios
 - **WebSockets:** Socket.io-client
-- **Iconos:** Phosphor icons + Lucide React
-
+- **Iconos:** Phosphor icons
 ## Estructura del Proyecto
 
 ```
@@ -385,7 +384,7 @@ const { data, loading, error, refetch } = useAPI('/api/endpoint')
 - Instalar y configurar Tailwind CSS v4
 - Configurar ShadCN/UI para JavaScript
 - Configurar Firebase Auth SDK
-- Instalar dependencias: axios, socket.io-client, zustand, lucide-react
+- Instalar dependencias: axios, socket.io-client, zustand, phosphor icons
 - Crear estructura de carpetas del proyecto
 
 ### **Sistema de Autenticación**
