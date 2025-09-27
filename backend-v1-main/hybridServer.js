@@ -31,6 +31,18 @@ app.use('/api/questions', require('./routes/questions'));
 app.use('/api/ai', require('./routes/ai'));
 
 io.on('connection', (socket) => {
+  console.log('🔌 New socket connection:', socket.id);
+  
+  // Ping handler para testing (sin autenticación)
+  socket.on('ping', (data) => {
+    console.log('📡 Received ping:', data);
+    socket.emit('pong', { 
+      timestamp: data.timestamp,
+      serverTime: Date.now(),
+      message: 'Pong from server!'
+    });
+  });
+
   // Listener para enviar la primera pregunta al socket que lo solicita
   socket.on('requestQuestion', async ({ gameId }) => {
 
@@ -39,8 +51,140 @@ io.on('connection', (socket) => {
   });
 
 
-  // Create Game
-  socket.on('createGame', async (options) => {
+  // Create Game (versión simplificada para desarrollo)
+  socket.on('createGame', async (gameData, callback) => {
+    try {
+      console.log('🎮 Creating game:', gameData);
+      
+      // Generar código de partida
+      const gameCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Crear datos mock de la partida
+      const game = {
+        id: 'game-' + Date.now(),
+        code: gameCode,
+        name: gameData.name || 'Partida Sin Nombre',
+        category: gameData.category || 'general',
+        difficulty: gameData.difficulty || 'medio',
+        questionCount: gameData.questionCount || 15,
+        isPublic: gameData.isPublic !== false,
+        host: gameData.createdBy || 'mock-user-id',
+        players: [{
+          id: gameData.createdBy || 'mock-user-id',
+          username: gameData.creatorUsername || 'Usuario',
+          isHost: true
+        }],
+        status: 'lobby',
+        createdAt: new Date().toISOString()
+      };
+      
+      // Unir al socket a la room del juego
+      socket.join(game.id);
+      
+      console.log('✅ Game created successfully:', game);
+      
+      // Responder con callback si existe
+      if (callback) {
+        callback({
+          success: true,
+          data: game
+        });
+      }
+      
+      // Emitir evento de actualización a la room
+      socket.to(game.id).emit('gameUpdate', {
+        game: game,
+        players: game.players
+      });
+      
+    } catch (error) {
+      console.error('❌ Error creating game:', error);
+      if (callback) {
+        callback({
+          success: false,
+          error: error.message || 'Error creating game'
+        });
+      }
+    }
+  });
+
+  // Join Game (versión simplificada)
+  socket.on('joinGame', async (data, callback) => {
+    try {
+      const { gameId } = data;
+      console.log('👥 Player joining game:', gameId);
+      
+      // Mock: simular unirse al juego
+      socket.join(gameId);
+      
+      const mockGame = {
+        id: gameId,
+        code: '123456',
+        name: 'Partida de Prueba',
+        status: 'lobby',
+        host: 'mock-user-id',
+        players: [
+          { id: 'mock-user-id', username: 'Host', isHost: true },
+          { id: 'player-2', username: 'Jugador 2', isHost: false }
+        ]
+      };
+      
+      if (callback) {
+        callback({
+          success: true,
+          data: mockGame
+        });
+      }
+      
+      // Notificar a otros jugadores
+      socket.to(gameId).emit('playerJoined', {
+        player: { id: 'player-2', username: 'Jugador 2', isHost: false }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error joining game:', error);
+      if (callback) {
+        callback({
+          success: false,
+          error: error.message || 'Error joining game'
+        });
+      }
+    }
+  });
+
+  // Start Game (versión simplificada)
+  socket.on('startGame', async (data, callback) => {
+    try {
+      const { gameId } = data;
+      console.log('🚀 Starting game:', gameId);
+      
+      if (callback) {
+        callback({
+          success: true,
+          data: { message: 'Game started successfully' }
+        });
+      }
+      
+      // Notificar a todos los jugadores que el juego ha comenzado
+      io.to(gameId).emit('gameStarted', {
+        gameId: gameId,
+        totalQuestions: 15,
+        message: 'La partida ha comenzado!'
+      });
+      
+    } catch (error) {
+      console.error('❌ Error starting game:', error);
+      if (callback) {
+        callback({
+          success: false,
+          error: error.message || 'Error starting game'
+        });
+      }
+    }
+  });
+
+  // Create Game Original (comentado para desarrollo)
+  socket.on('createGameOriginal', async (options) => {
     try {
       // Log del token recibido
       // Validar el token de autenticación
