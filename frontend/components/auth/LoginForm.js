@@ -77,7 +77,7 @@ export default function LoginForm() {
     clearError()
     
     // Iniciar sesión
-    const result = await login(formData.email, formData.password)
+    const result = await login(formData.email, formData.password, formData.rememberMe)
     
     if (result.success) {
       setShowSuccess(true)

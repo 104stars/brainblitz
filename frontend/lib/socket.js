@@ -5,14 +5,26 @@ class SocketManager {
     this.socket = null
     this.connected = false
     this.listeners = new Map()
+    this.currentToken = null
+    this.connectionAttempts = 0
+    this.maxConnectionAttempts = 3
   }
 
   connect(token = null) {
-    if (this.socket && this.connected) {
+    // Si ya hay una conexión activa con el mismo token, reutilizarla
+    if (this.socket && this.connected && this.currentToken === token) {
+      console.log('Reusing existing socket connection')
       return this.socket
     }
 
+    // Si hay una conexión pero con diferente token, desconectar primero
+    if (this.socket && this.currentToken !== token) {
+      console.log('Token changed, reconnecting...')
+      this.disconnect()
+    }
+
     const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000'
+    this.currentToken = token
     
     // Configuración específica para producción vs desarrollo
     const isProduction = SOCKET_URL.includes('render.com') || SOCKET_URL.includes('https')
@@ -44,6 +56,7 @@ class SocketManager {
     this.socket.on('connect', () => {
       console.log('Socket connected:', this.socket.id)
       this.connected = true
+      this.connectionAttempts = 0 // Reset counter on successful connection
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -79,6 +92,8 @@ class SocketManager {
       this.socket.disconnect()
       this.socket = null
       this.connected = false
+      this.currentToken = null
+      this.connectionAttempts = 0
       this.listeners.clear()
     }
   }

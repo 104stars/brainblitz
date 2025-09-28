@@ -13,6 +13,11 @@ export const useSocket = () => {
     if (isAuthenticated && token) {
       try {
         const socket = socketManager.connect(token)
+        // Sincronizar estado inicial al reutilizar una conexión existente
+        setConnected(socketManager.isConnected())
+        if (socketManager.isConnected()) {
+          setError(null)
+        }
         
         // Escuchar cambios de conexión
         const handleConnect = () => {
@@ -54,9 +59,13 @@ export const useSocket = () => {
         setError(err.message)
       }
     } else {
-      // Desconectar si no está autenticado
-      socketManager.disconnect()
-      setConnected(false)
+      // Solo desconectar si realmente no está autenticado
+      // No desconectar durante transiciones de navegación
+      if (!isAuthenticated && !token) {
+        console.log('User not authenticated, disconnecting socket')
+        socketManager.disconnect()
+        setConnected(false)
+      }
     }
 
     // Cleanup al desmontar

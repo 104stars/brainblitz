@@ -10,6 +10,12 @@ export const useSocketDebug = () => {
   useEffect(() => {
     try {
       const socket = socketManager.connect() // Sin token para debug
+
+      // Si ya estaba conectado antes de montar este hook, reflejarlo inmediatamente
+      if (socket?.connected || socketManager.isConnected()) {
+        setConnected(true)
+        setError(null)
+      }
       
       // Escuchar cambios de conexión
       const handleConnect = () => {

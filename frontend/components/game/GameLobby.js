@@ -3,9 +3,9 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGame } from '../../hooks/useGame'
-import { useSocketDebug } from '../../hooks/useSocketDebug'
 import { useAuth } from '../../hooks/useAuth'
 import LoadingButton from '../auth/LoadingButton'
+import ConnectionStatus from '../debug/ConnectionStatus'
 import {
   PlayIcon,
   ShareIcon,
@@ -29,19 +29,19 @@ export default function GameLobby({ gameId }) {
     error,
     startGame,
     leaveGame,
-    clearError
+    clearError,
+    connected
   } = useGame()
   
-  // Hook separado para el estado de conexión WebSocket
-  const { connected } = useSocketDebug()
+  // Estado de conexión provisto por el socket autenticado del juego
 
-  // Si no hay juego actual, redirigir al dashboard
+  // Si no hay juego actual, redirigir al dashboard (sin depender de connected)
   useEffect(() => {
-    if (!loading && !currentGame && connected) {
+    if (!loading && !currentGame) {
       console.log('No current game, redirecting to dashboard')
-      router.push('/dashboard')
+      router.replace('/dashboard')
     }
-  }, [currentGame, loading, connected, router])
+  }, [currentGame, loading, router])
 
   const handleStartGame = async () => {
     if (!isHost || !gameId) return
@@ -115,11 +115,14 @@ export default function GameLobby({ gameId }) {
             >
               Volver al Dashboard
             </button>
-          </div>
         </div>
       </div>
-    )
-  }
+      
+      {/* Debug Component - Temporal */}
+      <ConnectionStatus />
+    </div>
+  )
+}
 
   return (
     <div className="min-h-screen bg-gray-50">

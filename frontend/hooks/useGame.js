@@ -229,24 +229,26 @@ export const useGame = () => {
 
   // Salir del juego
   const leaveGame = useCallback(async (gameId) => {
-    if (!connected || !gameId) {
-      return
-    }
-
+    // Siempre intentamos salir limpiamente, incluso si no hay conexión
     setLoading(true)
+    setError(null)
 
     try {
-      await socketLeaveGame(gameId)
-      resetGame()
-      
-      console.log('Left game successfully')
-      
-      // Redirigir al dashboard
-      router.push('/dashboard')
+      if (connected && gameId) {
+        // No bloquear si el backend no envía ACK: usar timeout corto
+        const ackOrTimeout = Promise.race([
+          socketLeaveGame(gameId),
+          new Promise((resolve) => setTimeout(resolve, 800))
+        ])
+        await ackOrTimeout
+      }
     } catch (err) {
       console.error('Error leaving game:', err)
-      setError(err.message || 'Error al salir de la partida')
+      // No bloquear navegación por error al salir
     } finally {
+      resetGame()
+      console.log('Left game (frontend)')
+      router.replace('/dashboard')
       setLoading(false)
     }
   }, [connected, router, socketLeaveGame, setLoading, setError, resetGame])
