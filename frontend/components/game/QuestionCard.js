@@ -5,9 +5,9 @@ import { memo } from 'react'
 function QuestionCard({ question, selected, locked, onSelect, showCorrect = false }) {
   if (!question) return null
 
-  const handleClick = (value) => {
+  const handleClick = (value, index) => {
     if (locked) return
-    onSelect?.(value)
+    onSelect?.({ value, index })
   }
 
   return (
@@ -34,7 +34,7 @@ function QuestionCard({ question, selected, locked, onSelect, showCorrect = fals
               } ${locked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
               aria-pressed={isSelected}
               aria-disabled={locked}
-              onClick={() => handleClick(value)}
+              onClick={() => handleClick(value, idx)}
             >
               <span className="font-medium text-gray-900">{value}</span>
             </button>

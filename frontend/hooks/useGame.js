@@ -10,6 +10,7 @@ export const useGame = () => {
   const { user, username, token } = useAuth()
   const { connected, on, off, createGame: socketCreateGame, joinGame: socketJoinGame, leaveGame: socketLeaveGame, startGame: socketStartGame, submitAnswer: socketSubmitAnswer, requestQuestion: socketRequestQuestion, requestRemainingTime: socketRequestRemaining } = useSocket()
   const questionStartRef = useRef(null)
+  const submittedAnswerRef = useRef(null)
   
   const {
     currentGame,
@@ -23,6 +24,7 @@ export const useGame = () => {
     scores,
     myScore,
     finalResults,
+    answerResult,
     loading,
     error,
     
@@ -116,14 +118,44 @@ export const useGame = () => {
       // Reset de feedback/locks en nueva pregunta
       try { setAnswerResult(null) } catch (_) {}
       questionStartRef.current = Date.now()
+      submittedAnswerRef.current = null
     }
 
     // Listener: Resultado de respuesta
     const handleAnswerResult = (data) => {
       console.log('Answer result:', data)
-      updateScores(data.scores)
-      updateMyScore(data.playerScore || 0)
-      setAnswerResult(data)
+      // data.players => [{ uid, displayName, score, responseTimes }]
+      let wasCorrect = false
+      if (Array.isArray(data?.players)) {
+        // Actualizar lista de jugadores normalizada
+        setPlayers(data.players.map(normalizePlayer))
+        // Construir mapa de puntajes
+        const newScores = {}
+        data.players.forEach((p) => {
+          const id = p.uid || p.id
+          if (id) newScores[id] = typeof p.score === 'number' ? p.score : 0
+        })
+        updateScores(newScores)
+        // Actualizar mi puntaje y determinar si fue correcta
+        const me = data.players.find((p) => (p.uid || p.id) === user?.uid)
+        const previousScore = myScore
+        const newScore = me?.score || 0
+        updateMyScore(newScore)
+        // Si el puntaje aumentó, la respuesta fue correcta
+        wasCorrect = newScore > previousScore
+      }
+      
+      // Si tenemos la respuesta enviada, podemos verificar también por índice
+      if (!wasCorrect && submittedAnswerRef.current !== null && typeof data.correctAnswerIndex === 'number') {
+        wasCorrect = submittedAnswerRef.current === data.correctAnswerIndex
+      }
+      
+      // Guardar feedback para UI (explicación / índice correcto / si fue correcta)
+      setAnswerResult({
+        correct: wasCorrect,
+        correctAnswerIndex: data.correctAnswerIndex,
+        explanation: data.explanation
+      })
       // desbloquear para la siguiente pregunta cuando llegue
     }
 
@@ -382,20 +414,26 @@ export const useGame = () => {
   }, [connected, isHost, socketStartGame, setLoading, setError])
 
   // Enviar respuesta (durante el juego)
-  const submitAnswer = useCallback(async (answerValue) => {
+  const submitAnswer = useCallback(async (answerValueOrIndex) => {
     if (!connected || !currentGame?.id) {
       throw new Error('No hay conexión o juego activo')
     }
 
     // Calcular elapsed desde que llegó la pregunta
     const elapsedMs = questionStartRef.current ? Date.now() - questionStartRef.current : null
-    const valueToSend = answerValue === '__timeout__' ? null : answerValue
+    const isIndex = typeof answerValueOrIndex === 'number'
+    const isTimeout = answerValueOrIndex === '__timeout__'
+    const valueToSend = isTimeout ? null : (isIndex ? undefined : answerValueOrIndex)
+    const indexToSend = isTimeout ? undefined : (isIndex ? answerValueOrIndex : undefined)
+
+    // Guardar la respuesta enviada para validación posterior
+    submittedAnswerRef.current = isTimeout ? null : (isIndex ? answerValueOrIndex : null)
 
     try {
-      lockAnswer(answerValue)
+      lockAnswer(isIndex ? null : answerValueOrIndex)
       await socketSubmitAnswer(currentGame.id, currentQuestionIndex, {
         value: valueToSend,
-        index: typeof answerValue === 'number' ? answerValue : undefined,
+        index: indexToSend,
         elapsedMs,
         uid: user?.uid
       })
@@ -405,7 +443,7 @@ export const useGame = () => {
       unlockAnswer()
       throw err
     }
-  }, [connected, currentGame?.id, currentQuestionIndex, socketSubmitAnswer, lockAnswer, unlockAnswer])
+  }, [connected, currentGame?.id, currentQuestionIndex, socketSubmitAnswer, lockAnswer, unlockAnswer, user?.uid])
 
   return {
     // Estado
@@ -420,6 +458,7 @@ export const useGame = () => {
     scores,
     myScore,
     finalResults,
+    answerResult,
     loading,
     error,
     connected,

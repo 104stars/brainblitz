@@ -20,6 +20,7 @@ export default function GameRoom({ gameId }) {
     totalQuestions,
     timeRemaining,
     players,
+    scores,
     myScore,
     finalResults,
     loading,
@@ -58,12 +59,13 @@ export default function GameRoom({ gameId }) {
     setShowDisconnected(!connected)
   }, [connected])
 
-  const handleSelect = useCallback(async (value) => {
+  const handleSelect = useCallback(async (payload) => {
     if (localLocked) return
+    const { value, index } = typeof payload === 'object' && payload !== null ? payload : { value: payload, index: undefined }
     setLocalSelected(value)
     setLocalLocked(true)
     try {
-      await submitAnswer(value)
+      await submitAnswer(typeof index === 'number' ? index : value)
     } catch (e) {
       setLocalLocked(false)
     }
@@ -132,7 +134,7 @@ export default function GameRoom({ gameId }) {
               <AnswerResult result={store?.answerResult} />
             </div>
             <div className="space-y-6">
-              <ScoreBoard players={players} currentUserId={currentGame?.currentUserId} />
+              <ScoreBoard players={players} scores={scores} currentUserId={currentGame?.currentUserId} />
             </div>
           </div>
         )}

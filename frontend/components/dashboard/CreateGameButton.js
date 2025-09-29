@@ -43,7 +43,7 @@ export default function CreateGameButton() {
           
           <button
             onClick={() => alert('Función de partida rápida será implementada próximamente')}
-            className="flex-1 sm:flex-none border-2 border-white border-opacity-30 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white hover:bg-opacity-10 transition-all duration-200"
+            className="flex-1 sm:flex-none border-2 border-white border-opacity-30 text-white px-6 py-3 hover:text-brand rounded-xl font-semibold hover:bg-white hover:bg-opacity-10 transition-all duration-200"
           >
             Partida Rápida
           </button>

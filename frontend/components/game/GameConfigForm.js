@@ -278,7 +278,7 @@ export default function GameConfigForm() {
         {/* Nombre de la partida */}
         <div className="space-y-2">
           <label className="block text-lg font-semibold text-gray-900">
-            Nombre de la Partida
+            Nombre de la Partida <span className="text-red-500">*</span>
           </label>
           <input
             type="text"

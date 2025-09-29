@@ -1,16 +1,16 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useAuth } from '../../hooks/useAuth'
-import UserStats from './UserStats'
-import PublicGamesList from './PublicGamesList'
-import CreateGameButton from './CreateGameButton'
-import DashboardHeader from './DashboardHeader'
-import JoinGameModal from './JoinGameModal'
+import { useState } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import UserStats from "./UserStats";
+import PublicGamesList from "./PublicGamesList";
+import CreateGameButton from "./CreateGameButton";
+import DashboardHeader from "./DashboardHeader";
+import JoinGameModal from "./JoinGameModal";
 
 export default function DashboardContent() {
-  const { user, username } = useAuth()
-  const [showJoinModal, setShowJoinModal] = useState(false)
+  const { user, username } = useAuth();
+  const [showJoinModal, setShowJoinModal] = useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-brand-25 to-gray-50">
@@ -22,10 +22,12 @@ export default function DashboardContent() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            ¡Bienvenido de vuelta, {username || user?.email?.split('@')[0] || 'Jugador'}! 👋
+            ¡Bienvenido de vuelta,{" "}
+            {username || user?.email?.split("@")[0] || "Jugador"}! 👋
           </h1>
           <p className="text-gray-600">
-            ¿Listo para poner a prueba tus conocimientos? Crea una nueva partida o únete a una existente.
+            ¿Listo para poner a prueba tus conocimientos? Crea una nueva partida
+            o únete a una existente.
           </p>
         </div>
 
@@ -35,9 +37,27 @@ export default function DashboardContent() {
           <div className="lg:col-span-1 space-y-6">
             {/* User Stats */}
             <UserStats user={user} />
-            
+
             {/* Create Game Button */}
             <CreateGameButton />
+
+            {/* Join Game by Code - Quick Access */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Unirse a Partida
+              </h3>
+              <button
+                onClick={() => setShowJoinModal(true)}
+                className="group w-full p-4 border-2 border-brand rounded-xl hover:bg-brand transition-all duration-200 text-center"
+              >
+                <div className="text-brand font-semibold mb-1 group-hover:text-white transition-colors duration-200">
+                  Unirse por Código
+                </div>
+                <div className="text-sm text-gray-600 group-hover:text-white transition-colors duration-200">
+                  Ingresa un código de 6 dígitos
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Right Column - Public Games */}
@@ -48,40 +68,40 @@ export default function DashboardContent() {
 
         {/* Quick Actions */}
         <div className="mt-12 bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <button 
-              onClick={() => setShowJoinModal(true)}
-              className="p-4 border border-gray-200 rounded-xl hover:border-brand hover:bg-brand-50 transition-all duration-200 text-left"
-            >
-              <div className="text-brand font-semibold mb-1">Unirse por Código</div>
-              <div className="text-sm text-gray-600">Ingresa un código de 6 dígitos para unirte</div>
-            </button>
-            
-            <button 
-              onClick={() => alert('Función será implementada próximamente')}
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Acciones Rápidas
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={() => alert("Función será implementada próximamente")}
               className="p-4 border border-gray-200 rounded-xl hover:border-brand hover:bg-brand-50 transition-all duration-200 text-left"
             >
               <div className="text-brand font-semibold mb-1">Historial</div>
-              <div className="text-sm text-gray-600">Revisa tus partidas anteriores</div>
+              <div className="text-sm text-gray-600">
+                Revisa tus partidas anteriores
+              </div>
             </button>
-            
-            <button 
-              onClick={() => alert('Función será implementada próximamente')}
+
+            <button
+              onClick={() => alert("Función será implementada próximamente")}
               className="p-4 border border-gray-200 rounded-xl hover:border-brand hover:bg-brand-50 transition-all duration-200 text-left"
             >
-              <div className="text-brand font-semibold mb-1">Ranking Global</div>
-              <div className="text-sm text-gray-600">Ve tu posición en el ranking</div>
+              <div className="text-brand font-semibold mb-1">
+                Ranking Global
+              </div>
+              <div className="text-sm text-gray-600">
+                Ve tu posición en el ranking
+              </div>
             </button>
           </div>
         </div>
       </main>
 
       {/* Join Game Modal */}
-      <JoinGameModal 
-        isOpen={showJoinModal} 
-        onClose={() => setShowJoinModal(false)} 
+      <JoinGameModal
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
       />
     </div>
-  )
+  );
 }
