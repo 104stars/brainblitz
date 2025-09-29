@@ -19,6 +19,7 @@ export const useAuthStore = create(
       isAuthenticated: false,
       loading: false,
       error: null,
+      rememberMe: false,
 
       // Acciones
       setUser: (user) => set({ user, isAuthenticated: !!user }),
@@ -71,10 +72,17 @@ export const useAuthStore = create(
       },
 
       // Login con Firebase
-      login: async (email, password) => {
+      login: async (email, password, rememberMe = false) => {
         set({ loading: true, error: null })
         
         try {
+          // Configurar persistencia de Firebase Auth según rememberMe
+          if (typeof window !== 'undefined') {
+            const { setPersistence, browserLocalPersistence, browserSessionPersistence } = await import('firebase/auth')
+            const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence
+            await setPersistence(auth, persistenceType)
+          }
+          
           const userCredential = await signInWithEmailAndPassword(auth, email, password)
           const firebaseUser = userCredential.user
           const token = await firebaseUser.getIdToken()
@@ -87,7 +95,8 @@ export const useAuthStore = create(
             },
             token,
             isAuthenticated: true,
-            loading: false
+            loading: false,
+            rememberMe // Guardar la preferencia de recordar
           })
           
           return { success: true, user: firebaseUser }
@@ -112,7 +121,8 @@ export const useAuthStore = create(
             token: null,
             isAuthenticated: false,
             loading: false,
-            error: null
+            error: null,
+            rememberMe: false
           })
           return { success: true }
         } catch (error) {
@@ -159,6 +169,8 @@ export const useAuthStore = create(
           if (firebaseUser) {
             try {
               const token = await firebaseUser.getIdToken()
+              const currentState = get()
+              
               set({
                 user: {
                   uid: firebaseUser.uid,
@@ -167,7 +179,9 @@ export const useAuthStore = create(
                 },
                 token,
                 isAuthenticated: true,
-                loading: false
+                loading: false,
+                // Mantener el estado de rememberMe si ya existe
+                rememberMe: currentState.rememberMe || false
               })
             } catch (error) {
               console.error('Auth state change error:', error)
@@ -178,7 +192,8 @@ export const useAuthStore = create(
               user: null,
               token: null,
               isAuthenticated: false,
-              loading: false
+              loading: false,
+              rememberMe: false
             })
           }
         })
@@ -188,8 +203,66 @@ export const useAuthStore = create(
       name: 'brainblitz-auth', // Nombre para localStorage
       partialize: (state) => ({
         user: state.user,
-        isAuthenticated: state.isAuthenticated
-      }) // Solo persistir datos necesarios
+        isAuthenticated: state.isAuthenticated,
+        rememberMe: state.rememberMe
+      }), // Solo persistir datos necesarios
+      storage: {
+        getItem: (name) => {
+          // Primero intentar obtener de localStorage (sesiones persistentes)
+          let storedState = localStorage.getItem(name)
+          if (storedState) {
+            try {
+              const parsedState = JSON.parse(storedState)
+              // Verificar que tenga rememberMe activo
+              if (parsedState?.state?.rememberMe) {
+                return storedState
+              } else {
+                // Si no tiene rememberMe, limpiar localStorage
+                localStorage.removeItem(name)
+              }
+            } catch (e) {
+              localStorage.removeItem(name)
+            }
+          }
+          
+          // Luego intentar obtener de sessionStorage (sesiones temporales)
+          storedState = sessionStorage.getItem(name)
+          if (storedState) {
+            try {
+              const parsedState = JSON.parse(storedState)
+              return storedState
+            } catch (e) {
+              sessionStorage.removeItem(name)
+            }
+          }
+          
+          return null
+        },
+        setItem: (name, value) => {
+          try {
+            // Asegurar que siempre trabajamos con una cadena JSON válida
+            const valueString = typeof value === 'string' ? value : JSON.stringify(value)
+            const parsedValue = typeof value === 'string' ? JSON.parse(value) : value
+            
+            // Limpiar ambos storages primero
+            localStorage.removeItem(name)
+            sessionStorage.removeItem(name)
+            
+            // Guardar en el storage apropiado según rememberMe
+            if (parsedValue?.state?.rememberMe) {
+              localStorage.setItem(name, valueString)
+            } else {
+              sessionStorage.setItem(name, valueString)
+            }
+          } catch (e) {
+            console.error('Error saving auth state:', e)
+          }
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name)
+          sessionStorage.removeItem(name)
+        }
+      }
     }
   )
 )

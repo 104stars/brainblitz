@@ -5,10 +5,11 @@ import {
   ClockIcon, 
   TagIcon,
   ArrowRightIcon,
-  LockIcon
+  LockIcon,
+  SpinnerGapIcon
 } from '@phosphor-icons/react/ssr'
 
-export default function GameCard({ game, onJoin }) {
+export default function GameCard({ game, onJoin, isJoining = false }) {
   const {
     id,
     name,
@@ -114,16 +115,21 @@ export default function GameCard({ game, onJoin }) {
       {/* Action Button */}
       <button
         onClick={handleJoin}
-        disabled={!isJoinable}
+        disabled={!isJoinable || isJoining}
         className={`
           w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200
-          ${isJoinable 
+          ${isJoinable && !isJoining
             ? 'bg-gradient-to-r from-brand to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 hover:shadow-md' 
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           }
         `}
       >
-        {status === 'playing' ? (
+        {isJoining ? (
+          <>
+            <SpinnerGapIcon size={16} className="animate-spin" />
+            <span>Uniéndose...</span>
+          </>
+        ) : status === 'playing' ? (
           <>
             <span>En progreso</span>
           </>
