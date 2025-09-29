@@ -1,13 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import UserStats from './UserStats'
 import PublicGamesList from './PublicGamesList'
 import CreateGameButton from './CreateGameButton'
 import DashboardHeader from './DashboardHeader'
+import JoinGameModal from './JoinGameModal'
 
 export default function DashboardContent() {
   const { user, username } = useAuth()
+  const [showJoinModal, setShowJoinModal] = useState(false)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-brand-25 to-gray-50">
@@ -48,11 +51,11 @@ export default function DashboardContent() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button 
-              onClick={() => alert('Función será implementada próximamente')}
+              onClick={() => setShowJoinModal(true)}
               className="p-4 border border-gray-200 rounded-xl hover:border-brand hover:bg-brand-50 transition-all duration-200 text-left"
             >
-              <div className="text-brand font-semibold mb-1">Ver Mi Perfil</div>
-              <div className="text-sm text-gray-600">Revisa tu información y configuración</div>
+              <div className="text-brand font-semibold mb-1">Unirse por Código</div>
+              <div className="text-sm text-gray-600">Ingresa un código de 6 dígitos para unirte</div>
             </button>
             
             <button 
@@ -73,6 +76,12 @@ export default function DashboardContent() {
           </div>
         </div>
       </main>
+
+      {/* Join Game Modal */}
+      <JoinGameModal 
+        isOpen={showJoinModal} 
+        onClose={() => setShowJoinModal(false)} 
+      />
     </div>
   )
 }

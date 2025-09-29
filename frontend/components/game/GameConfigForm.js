@@ -9,6 +9,8 @@ import DifficultySelector from './DifficultySelector'
 import QuestionCountSelector from './QuestionCountSelector'
 import GameTypeSelector from './GameTypeSelector'
 import LoadingButton from '../auth/LoadingButton'
+import { aiAPI } from '../../lib/api'
+import { getPresetQuestions, mapDifficultyIdToApi } from '../../lib/presetQuestions'
 import { 
   PlayIcon, 
   SparkleIcon, 
@@ -32,6 +34,8 @@ export default function GameConfigForm() {
   
   const [localError, setLocalError] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [questions, setQuestions] = useState([])
+  const [generating, setGenerating] = useState(false)
 
   // Combinar loading y error del hook useGame con el local
   const loading = gameLoading
@@ -48,6 +52,11 @@ export default function GameConfigForm() {
     }
     if (gameError) {
       clearError()
+    }
+
+    // Si el usuario cambia parámetros clave, invalidar preguntas generadas
+    if (['category','difficulty','questionCount'].includes(field)) {
+      setQuestions([])
     }
   }
 
@@ -86,6 +95,42 @@ export default function GameConfigForm() {
     setShowPreview(true)
   }
 
+  const handleGenerateQuestions = async () => {
+    const errors = validateForm()
+    if (errors.length > 0) {
+      setLocalError(errors[0])
+      return
+    }
+
+    try {
+      setGenerating(true)
+      setLocalError(null)
+
+      const topic = formData.category?.name || formData.category?.id
+      const difficultyApi = mapDifficultyIdToApi(formData.difficulty?.id)
+      const count = formData.questionCount
+
+      const data = await aiAPI.generateQuestions({
+        topic,
+        difficulty: difficultyApi,
+        count,
+        useAI: true
+      })
+
+      if (Array.isArray(data?.questions) && data.questions.length > 0) {
+        setQuestions(data.questions.slice(0, count))
+      } else {
+        // Fallback local
+        setQuestions(getPresetQuestions(formData.category?.name || formData.category?.id, formData.difficulty?.id, count))
+      }
+    } catch (e) {
+      console.warn('AI generation failed, using preset questions:', e)
+      setQuestions(getPresetQuestions(formData.category?.name || formData.category?.id, formData.difficulty?.id, formData.questionCount))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   const handleCreateGame = async () => {
     const errors = validateForm()
     if (errors.length > 0) {
@@ -107,7 +152,8 @@ export default function GameConfigForm() {
         category: formData.category,
         difficulty: formData.difficulty,
         questionCount: formData.questionCount,
-        gameType: formData.gameType
+        gameType: formData.gameType,
+        questions
       }
       
       console.log('Creating game with WebSocket:', gameData)
@@ -271,6 +317,27 @@ export default function GameConfigForm() {
           onGameTypeChange={handleInputChange('gameType')}
           disabled={loading}
         />
+
+        {/* Generar preguntas */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm text-gray-600">
+            {questions.length > 0 ? (
+              <span>
+                Preguntas preparadas: <strong>{questions.length}</strong> / {formData.questionCount}
+              </span>
+            ) : (
+              <span>No hay preguntas generadas aún.</span>
+            )}
+          </div>
+          <LoadingButton
+            onClick={handleGenerateQuestions}
+            loading={generating}
+            disabled={loading || !formData.category || !formData.difficulty}
+            variant="secondary"
+          >
+            Generar preguntas
+          </LoadingButton>
+        </div>
 
         {/* Error */}
         {error && (

@@ -147,8 +147,13 @@ class SocketManager {
     return this.emit('createGame', gameData, callback)
   }
 
-  joinGame(gameId, callback) {
-    return this.emit('joinGame', { gameId }, callback)
+  createGameOriginal(gameData) {
+    return this.emit('createGameOriginal', gameData)
+  }
+
+  joinGame(gameId, userPayload, callback) {
+    // userPayload: { uid, displayName }
+    return this.emit('joinGame', { gameId, ...userPayload }, callback)
   }
 
   leaveGame(gameId, callback) {

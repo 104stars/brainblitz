@@ -123,27 +123,123 @@ export const useSocket = () => {
         return
       }
 
+      let settled = false
+      const clear = () => { if (!settled) { settled = true } }
+
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          reject(new Error('El servidor no respondió al crear la partida. Este backend puede requerir preguntas generadas por IA. Intenta de nuevo o genera preguntas antes de crear.'))
+        }
+      }, 10000)
+
+      // 1) Intento con createGame (ACK)
       socketManager.createGame(gameData, (response) => {
-        if (response.success) {
+        if (settled) return
+        clearTimeout(timeoutId)
+        settled = true
+        if (response?.success) {
           resolve(response.data)
         } else {
-          reject(new Error(response.error || 'Failed to create game'))
+          reject(new Error(response?.error || 'Failed to create game'))
         }
       })
+
+      // 2) En paralelo, compatibilidad con createGameOriginal (sin ACK):
+      //    Resolver cuando llegue el evento 'gameCreated'
+      const onGameCreated = (payload) => {
+        if (settled) return
+        clearTimeout(timeoutId)
+        settled = true
+        // payload esperado: { gameId, questions, ... }
+        resolve({ id: payload?.gameId || payload?.id, ...payload })
+        // cleanup listener
+        socketManager.off('gameCreated', onGameCreated)
+        socketManager.off('error', onServerError)
+      }
+
+      const onServerError = (payload) => {
+        if (settled) return
+        clearTimeout(timeoutId)
+        settled = true
+        const message = payload?.error || payload?.message || 'Error al crear la partida (server)'
+        // cleanup listeners
+        socketManager.off('gameCreated', onGameCreated)
+        socketManager.off('error', onServerError)
+        reject(new Error(message))
+      }
+
+      socketManager.on('gameCreated', onGameCreated)
+      socketManager.on('error', onServerError)
+      socketManager.createGameOriginal(gameData)
     })
   }, [connected])
 
-  const joinGame = useCallback((gameId) => {
+  const joinGame = useCallback((gameId, userPayload) => {
     return new Promise((resolve, reject) => {
       if (!connected) {
         reject(new Error('Socket not connected'))
         return
       }
 
-      socketManager.joinGame(gameId, (response) => {
-        if (response.success) {
+      let settled = false
+      const cleanup = () => {
+        socketManager.off('playerJoined', onPlayerJoined)
+        socketManager.off('gameUpdate', onGameUpdate)
+        socketManager.off('error', onServerError)
+      }
+
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          cleanup()
+          reject(new Error('Timeout al unirse a la partida'))
+        }
+      }, 8000)
+
+      const onPlayerJoined = (payload) => {
+        if (settled) return
+        // Resolver con lo que tengamos; incluimos id y players
+        settled = true
+        clearTimeout(timeoutId)
+        cleanup()
+        resolve({ id: gameId, players: payload?.players || [] })
+      }
+
+      const onGameUpdate = (payload) => {
+        if (settled) return
+        if (payload?.game) {
+          settled = true
+          clearTimeout(timeoutId)
+          cleanup()
+          resolve(payload.game)
+        }
+      }
+
+      const onServerError = (payload) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        cleanup()
+        reject(new Error(payload?.error || payload?.message || 'Error al unirse a la partida (server)'))
+      }
+
+      socketManager.on('playerJoined', onPlayerJoined)
+      socketManager.on('gameUpdate', onGameUpdate)
+      socketManager.on('error', onServerError)
+
+      // Emitir join (el backend no envía ACK; si lo hiciera, este callback resolvería igual)
+      socketManager.joinGame(gameId, userPayload, (response) => {
+        if (settled) return
+        if (response?.success) {
+          settled = true
+          clearTimeout(timeoutId)
+          cleanup()
           resolve(response.data)
-        } else {
+        } else if (response) {
+          settled = true
+          clearTimeout(timeoutId)
+          cleanup()
           reject(new Error(response.error || 'Failed to join game'))
         }
       })

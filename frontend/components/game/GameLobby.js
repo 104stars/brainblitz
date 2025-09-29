@@ -63,20 +63,21 @@ export default function GameLobby({ gameId }) {
     }
   }
 
+  const codeToShow = currentGame?.code || currentGame?.id
+
   const handleCopyGameCode = () => {
-    if (currentGame?.code) {
-      navigator.clipboard.writeText(currentGame.code)
+    if (codeToShow) {
+      navigator.clipboard.writeText(codeToShow)
       // TODO: Show toast notification
       console.log('Game code copied to clipboard')
     }
   }
 
   const handleShareGame = () => {
-    if (currentGame?.code) {
-      const shareUrl = `${window.location.origin}/game/join/${currentGame.code}`
-      navigator.clipboard.writeText(shareUrl)
+    if (codeToShow) {
+      navigator.clipboard.writeText(codeToShow)
       // TODO: Show toast notification
-      console.log('Share URL copied to clipboard')
+      console.log('Game code copied to clipboard:', codeToShow)
     }
   }
 
@@ -173,7 +174,7 @@ export default function GameLobby({ gameId }) {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Game code */}
-            {currentGame.code && (
+            {codeToShow && (
               <div className="bg-white rounded-2xl shadow-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Código de la Partida
@@ -182,7 +183,7 @@ export default function GameLobby({ gameId }) {
                   <div className="flex-1">
                     <div className="text-center p-4 bg-gray-50 rounded-xl">
                       <div className="text-3xl font-bold text-brand tracking-wider">
-                        {currentGame.code}
+                        {codeToShow}
                       </div>
                       <p className="text-sm text-gray-600 mt-2">
                         Comparte este código para que otros se unan
@@ -289,7 +290,7 @@ export default function GameLobby({ gameId }) {
             <div className="space-y-3">
               {players.map((player) => (
                 <div
-                  key={player.id}
+                  key={player.id || player.uid || `${player.username}-${Math.random()}`}
                   className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">

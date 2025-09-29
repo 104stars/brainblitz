@@ -2,11 +2,12 @@ import { useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useGameStore from '../store/gameStore'
 import { useSocket } from './useSocket'
+import { mapDifficultyIdToApi } from '../lib/presetQuestions'
 import { useAuth } from './useAuth'
 
 export const useGame = () => {
   const router = useRouter()
-  const { user, username } = useAuth()
+  const { user, username, token } = useAuth()
   const { connected, on, off, createGame: socketCreateGame, joinGame: socketJoinGame, leaveGame: socketLeaveGame, startGame: socketStartGame } = useSocket()
   
   const {
@@ -50,15 +51,24 @@ export const useGame = () => {
   useEffect(() => {
     if (!connected) return
 
+    // Normalizador de jugadores (backend puede enviar uid/displayName)
+    const normalizePlayer = (p) => ({
+      id: p?.id || p?.uid,
+      username: p?.username || p?.displayName || p?.email || 'Jugador',
+      score: typeof p?.score === 'number' ? p.score : 0,
+      responseTimes: Array.isArray(p?.responseTimes) ? p.responseTimes : []
+    })
+
     // Listener: Jugador se unió
     const handlePlayerJoined = (data) => {
       console.log('Player joined:', data)
-      addPlayer(data.player)
-      
-      // Mostrar notificación opcional
-      if (data.player.id !== user?.uid) {
-        // TODO: Mostrar toast notification
-        console.log(`${data.player.username} se unió a la partida`)
+      if (Array.isArray(data?.players)) {
+        setPlayers(data.players.map(normalizePlayer))
+      } else if (data?.player) {
+        addPlayer(normalizePlayer(data.player))
+        if ((data.player.id || data.player.uid) !== user?.uid) {
+          console.log(`${data.player.displayName || data.player.username || 'Jugador'} se unió a la partida`)
+        }
       }
     }
 
@@ -123,7 +133,7 @@ export const useGame = () => {
         })
       }
       if (data.players) {
-        setPlayers(data.players)
+        setPlayers(data.players.map(normalizePlayer))
       }
     }
 
@@ -160,30 +170,50 @@ export const useGame = () => {
     setError(null)
 
     try {
+      const difficultyApi = mapDifficultyIdToApi(gameData.difficulty?.id)
+      const topic = gameData.category?.name || gameData.category?.id || 'general'
       const gameConfig = {
+        // Compat payload para servidores "simplificado" y "original"
         name: gameData.gameName,
-        category: gameData.category.id,
-        difficulty: gameData.difficulty.id,
+        category: gameData.category?.id,
+        topic, // algunos backends esperan 'topic'
+        difficulty: difficultyApi, // 'easy'|'medium'|'hard'
+        difficultyId: gameData.difficulty?.id, // referencia local 'facil'|'medio'|'dificil'
         questionCount: gameData.questionCount,
+        count: gameData.questionCount, // algunos backends usan 'count'
         isPublic: gameData.gameType === 'public',
         createdBy: user?.uid,
-        creatorUsername: username
+        creatorUsername: username,
+        hostId: user?.uid,
+        displayName: username || user?.email?.split('@')[0] || 'Host',
+        ...(Array.isArray(gameData.questions) && gameData.questions.length ? { questions: gameData.questions } : {})
       }
 
       console.log('Creating game with config:', gameConfig)
       
-      const game = await socketCreateGame(gameConfig)
+      // Usar el token del store (emitido en login) para alinear con el handshake
+      const game = await socketCreateGame({ ...gameConfig, token })
       
       // Configurar el juego en el store
       setGame({
         ...game,
         currentUserId: user?.uid
       })
+      if (Array.isArray(game.players)) {
+        setPlayers(game.players.map((p) => ({
+          id: p?.id || p?.uid,
+          username: p?.username || p?.displayName || p?.email || 'Jugador',
+          score: typeof p?.score === 'number' ? p.score : 0,
+          responseTimes: Array.isArray(p?.responseTimes) ? p.responseTimes : []
+        })))
+      }
 
       console.log('Game created successfully:', game)
       
       // Redirigir al lobby
-      router.push(`/game/lobby/${game.id}`)
+      if (game?.id) {
+        router.push(`/game/lobby/${game.id}`)
+      }
       
       return game
     } catch (err) {
@@ -205,12 +235,23 @@ export const useGame = () => {
     setError(null)
 
     try {
-      const game = await socketJoinGame(gameId)
+      const game = await socketJoinGame(gameId, {
+        uid: user?.uid,
+        displayName: username || user?.email?.split('@')[0] || 'Jugador'
+      })
       
       setGame({
         ...game,
         currentUserId: user?.uid
       })
+      if (Array.isArray(game.players)) {
+        setPlayers(game.players.map((p) => ({
+          id: p?.id || p?.uid,
+          username: p?.username || p?.displayName || p?.email || 'Jugador',
+          score: typeof p?.score === 'number' ? p.score : 0,
+          responseTimes: Array.isArray(p?.responseTimes) ? p.responseTimes : []
+        })))
+      }
 
       console.log('Joined game successfully:', game)
       

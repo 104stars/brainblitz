@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowClockwiseIcon, MagnifyingGlassIcon } from '@phosphor-icons/react/ssr'
 import { gamesAPI } from '../../lib/api'
+import { useGame } from '../../hooks/useGame'
 import GameCard from './GameCard'
 
 export default function PublicGamesList() {
@@ -11,6 +12,10 @@ export default function PublicGamesList() {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [joiningGameId, setJoiningGameId] = useState(null)
+  
+  // Hook para unirse a partidas
+  const { joinGame } = useGame()
 
   const fetchGames = async () => {
     try {
@@ -75,19 +80,33 @@ export default function PublicGamesList() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleJoinGame = (game) => {
-    // TODO: Implementar lógica de unirse a partida
-    console.log('Joining game:', game)
-    alert(`Función de unirse a partida "${game.name}" será implementada próximamente`)
+  const handleJoinGame = async (game) => {
+    if (!game.id) {
+      console.error('Game ID is missing')
+      return
+    }
+    
+    try {
+      setJoiningGameId(game.id)
+      await joinGame(game.id) // useGame hook ya tiene esta función
+      // El hook automáticamente redirige al lobby
+    } catch (error) {
+      console.error('Error joining game:', error)
+      // TODO: Mostrar toast de error cuando implementemos notificaciones
+      alert(`Error al unirse a la partida: ${error.message}`)
+    } finally {
+      setJoiningGameId(null)
+    }
   }
 
   const filteredGames = games.filter(game => {
-    const matchesSearch = game.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         game.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         game.createdBy.toLowerCase().includes(searchTerm.toLowerCase())
-    
+    const name = (game?.name || '').toString().toLowerCase()
+    const category = (game?.category || game?.topic || '').toString().toLowerCase()
+    const createdBy = (game?.createdBy || game?.host || '').toString().toLowerCase()
+    const term = searchTerm.toLowerCase()
+
+    const matchesSearch = name.includes(term) || category.includes(term) || createdBy.includes(term)
     const matchesStatus = filterStatus === 'all' || game.status === filterStatus
-    
     return matchesSearch && matchesStatus
   })
 
@@ -181,6 +200,7 @@ export default function PublicGamesList() {
               key={game.id}
               game={game}
               onJoin={handleJoinGame}
+              isJoining={joiningGameId === game.id}
             />
           ))}
         </div>

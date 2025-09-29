@@ -124,13 +124,19 @@ export const aiAPI = {
   // GET /api/ai/topics
   getTopics: async () => {
     const response = await api.get('/ai/topics')
-    return response.data
+    // Backend shape: { success: true, topics: string[] }
+    return Array.isArray(response.data?.topics) ? response.data.topics : []
   },
   
   // GET /api/ai/difficulty-levels
   getDifficultyLevels: async () => {
     const response = await api.get('/ai/difficulty-levels')
-    return response.data
+    // Backend shape: { success: true, levels: [{ value, label }] }
+    const levels = response.data?.levels
+    if (Array.isArray(levels)) {
+      return levels.map(l => (typeof l === 'string' ? l : (l.label || l.value || ''))).filter(Boolean)
+    }
+    return []
   }
 }
 
