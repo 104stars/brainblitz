@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import useGameStore from '../store/gameStore'
 import { useSocket } from './useSocket'
@@ -8,7 +8,8 @@ import { useAuth } from './useAuth'
 export const useGame = () => {
   const router = useRouter()
   const { user, username, token } = useAuth()
-  const { connected, on, off, createGame: socketCreateGame, joinGame: socketJoinGame, leaveGame: socketLeaveGame, startGame: socketStartGame } = useSocket()
+  const { connected, on, off, createGame: socketCreateGame, joinGame: socketJoinGame, leaveGame: socketLeaveGame, startGame: socketStartGame, submitAnswer: socketSubmitAnswer, requestQuestion: socketRequestQuestion, requestRemainingTime: socketRequestRemaining } = useSocket()
+  const questionStartRef = useRef(null)
   
   const {
     currentGame,
@@ -32,9 +33,13 @@ export const useGame = () => {
     setGameState,
     setCurrentQuestion,
     setTimeRemaining,
+    setTotalQuestions,
+    lockAnswer,
+    unlockAnswer,
     updateScores,
     updateMyScore,
     setFinalResults,
+    setAnswerResult,
     setLoading,
     setError,
     clearError,
@@ -91,6 +96,10 @@ export const useGame = () => {
       console.log('Game started:', data)
       setGameState('playing')
       setCurrentQuestion(null, 0)
+      // backend emite questionsCount
+      if (typeof data?.questionsCount === 'number') {
+        setTotalQuestions(data.questionsCount)
+      }
       
       // Redirigir a la pantalla de juego
       if (currentGame?.id) {
@@ -101,8 +110,12 @@ export const useGame = () => {
     // Listener: Nueva pregunta
     const handleNewQuestion = (data) => {
       console.log('New question:', data)
-      setCurrentQuestion(data.question, data.questionIndex)
-      setTimeRemaining(data.question.timeLimit || 20)
+      const index = typeof data.index === 'number' ? data.index : (typeof data.questionIndex === 'number' ? data.questionIndex : 0)
+      setCurrentQuestion(data.question, index)
+      setTimeRemaining(data.question?.timeLimit || 20)
+      // Reset de feedback/locks en nueva pregunta
+      try { setAnswerResult(null) } catch (_) {}
+      questionStartRef.current = Date.now()
     }
 
     // Listener: Resultado de respuesta
@@ -110,6 +123,8 @@ export const useGame = () => {
       console.log('Answer result:', data)
       updateScores(data.scores)
       updateMyScore(data.playerScore || 0)
+      setAnswerResult(data)
+      // desbloquear para la siguiente pregunta cuando llegue
     }
 
     // Listener: Juego terminado
@@ -129,13 +144,46 @@ export const useGame = () => {
     const handleGameUpdate = (data) => {
       console.log('Game update:', data)
       if (data.game) {
+        const previousId = currentGame?.id || currentGame?.code
+        const nextId = data.game.id || data.game.gameId || previousId
+        const nextCode = data.game.code || nextId
         setGame({
           ...data.game,
+          id: nextId,
+          code: nextCode,
           currentUserId: user?.uid
         })
       }
       if (data.players) {
         setPlayers(data.players.map(normalizePlayer))
+      }
+    }
+
+    const handleHostChanged = (payload) => {
+      if (!payload || !payload.hostId) return
+      // Actualizar currentGame.hostId y recomputar isHost mediante setGame
+      const updated = {
+        ...currentGame,
+        hostId: payload.hostId
+      }
+      setGame({
+        ...updated,
+        currentUserId: user?.uid
+      })
+    }
+
+    // Al reconectar, intentar resincronizar pregunta y tiempo restante
+    const handleReconnectSync = async () => {
+      try {
+        if (!currentGame?.id) return
+        // Intentar pedir la pregunta actual
+        await socketRequestQuestion(currentGame.id, currentQuestionIndex)
+        const remaining = await socketRequestRemaining(currentGame.id, currentQuestionIndex)
+        if (typeof remaining === 'number') {
+          setTimeRemaining(Math.ceil(remaining / 1000))
+        }
+      } catch (e) {
+        // Ignorar errores de resincronización
       }
     }
 
@@ -154,6 +202,8 @@ export const useGame = () => {
     const removeGameFinished = on('gameFinished', handleGameFinished)
     const removeGameError = on('gameError', handleGameError)
     const removeGameUpdate = on('gameUpdate', handleGameUpdate)
+    const removeHostChanged = on('hostChanged', handleHostChanged)
+    const removeReconnected = on('reconnect', handleReconnectSync)
 
     // Cleanup
     return () => {
@@ -166,8 +216,10 @@ export const useGame = () => {
       removeGameFinished()
       removeGameError()
       removeGameUpdate()
+      removeHostChanged()
+      removeReconnected()
     }
-  }, [connected, currentGame?.id, user?.uid, router])
+  }, [connected, currentGame?.id, currentQuestionIndex, user?.uid, router])
 
   // Crear juego
   const createGame = useCallback(async (gameData) => {
@@ -206,6 +258,8 @@ export const useGame = () => {
       // Configurar el juego en el store
       setGame({
         ...game,
+        id: game?.id || game?.gameId,
+        code: game?.code || game?.id || game?.gameId,
         currentUserId: user?.uid
       })
       if (Array.isArray(game.players)) {
@@ -220,8 +274,9 @@ export const useGame = () => {
       console.log('Game created successfully:', game)
       
       // Redirigir al lobby
-      if (game?.id) {
-        router.push(`/game/lobby/${game.id}`)
+      if (game?.id || game?.gameId) {
+        const gid = game?.id || game?.gameId
+        router.push(`/game/lobby/${gid}`)
       }
       
       return game
@@ -251,6 +306,8 @@ export const useGame = () => {
       
       setGame({
         ...game,
+        id: game?.id || gameId || game?.gameId,
+        code: game?.code || game?.id || gameId || game?.gameId,
         currentUserId: user?.uid
       })
       if (Array.isArray(game.players)) {
@@ -324,6 +381,32 @@ export const useGame = () => {
     }
   }, [connected, isHost, socketStartGame, setLoading, setError])
 
+  // Enviar respuesta (durante el juego)
+  const submitAnswer = useCallback(async (answerValue) => {
+    if (!connected || !currentGame?.id) {
+      throw new Error('No hay conexión o juego activo')
+    }
+
+    // Calcular elapsed desde que llegó la pregunta
+    const elapsedMs = questionStartRef.current ? Date.now() - questionStartRef.current : null
+    const valueToSend = answerValue === '__timeout__' ? null : answerValue
+
+    try {
+      lockAnswer(answerValue)
+      await socketSubmitAnswer(currentGame.id, currentQuestionIndex, {
+        value: valueToSend,
+        index: typeof answerValue === 'number' ? answerValue : undefined,
+        elapsedMs,
+        uid: user?.uid
+      })
+    } catch (err) {
+      console.error('Error submitting answer:', err)
+      // Permitimos reintentar en caso de error, pero evitamos doble envío rápido
+      unlockAnswer()
+      throw err
+    }
+  }, [connected, currentGame?.id, currentQuestionIndex, socketSubmitAnswer, lockAnswer, unlockAnswer])
+
   return {
     // Estado
     currentGame,
@@ -346,6 +429,7 @@ export const useGame = () => {
     joinGame,
     leaveGame,
     startGame,
+    submitAnswer,
     clearError,
     resetGame,
 

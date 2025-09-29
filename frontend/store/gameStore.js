@@ -15,6 +15,9 @@ const useGameStore = create(
       currentQuestionIndex: 0,
       totalQuestions: 0,
       timeRemaining: 0,
+      answerLocked: false,
+      selectedAnswer: null,
+      answerResult: null,
       
       // Puntuaciones y resultados
       scores: {},
@@ -27,10 +30,11 @@ const useGameStore = create(
 
       // Acciones para gestionar el juego
       setGame: (game) => {
+        const hostField = game?.hostId || game?.host || game?.hostUid
         set({
           currentGame: game,
           gameState: game ? 'lobby' : 'idle',
-          isHost: game ? game.host === game.currentUserId : false,
+          isHost: game ? hostField === game.currentUserId : false,
           totalQuestions: game?.questionCount || 0,
           error: null
         })
@@ -61,12 +65,26 @@ const useGameStore = create(
         set({
           currentQuestion: question,
           currentQuestionIndex: index,
-          timeRemaining: question?.timeLimit || 20
+          timeRemaining: question?.timeLimit || 20,
+          answerLocked: false,
+          selectedAnswer: null
         })
       },
 
       setTimeRemaining: (time) => {
         set({ timeRemaining: time })
+      },
+
+      setTotalQuestions: (count) => {
+        set({ totalQuestions: typeof count === 'number' ? count : 0 })
+      },
+
+      lockAnswer: (answerValue) => {
+        set({ answerLocked: true, selectedAnswer: answerValue })
+      },
+
+      unlockAnswer: () => {
+        set({ answerLocked: false })
       },
 
       // Acciones para puntuaciones
@@ -83,6 +101,10 @@ const useGameStore = create(
           finalResults: results,
           gameState: 'finished'
         })
+      },
+
+      setAnswerResult: (result) => {
+        set({ answerResult: result })
       },
 
       // Acciones para UI
@@ -109,6 +131,9 @@ const useGameStore = create(
           currentQuestionIndex: 0,
           totalQuestions: 0,
           timeRemaining: 0,
+          answerLocked: false,
+          selectedAnswer: null,
+          answerResult: null,
           scores: {},
           myScore: 0,
           finalResults: null,

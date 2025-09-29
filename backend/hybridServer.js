@@ -131,7 +131,10 @@ io.on('connection', (socket) => {
         await gameRef.update({ players: game.players });
       }
       socket.join(gameId);
+      // Emitir tanto playerJoined como gameUpdate para forzar sincronización de lista
+      const gamePayload = { ...game, players: game.players, id: gameId, code: gameId }
       io.to(gameId).emit('playerJoined', { players: game.players });
+      io.to(gameId).emit('gameUpdate', { game: gamePayload });
     } catch (error) {
       socket.emit('error', { error: error.message });
     }
@@ -157,14 +160,25 @@ io.on('connection', (socket) => {
         players = players.filter(p => p.uid !== playerUid)
       }
 
+      // Reasignar host si el que salió era el anfitrión
+      let nextHostId = game.hostId
+      if (playerUid && game.hostId === playerUid) {
+        nextHostId = players.length > 0 ? players[0].uid : null
+      }
+
       if (players.length === 0) {
         // No quedan jugadores: eliminar la sala
         await gameRef.delete()
         io.to(gameId).emit('playersUpdated', { players: [] })
       } else {
-        await gameRef.update({ players })
+        const updatePayload = nextHostId ? { players, hostId: nextHostId } : { players }
+        await gameRef.update(updatePayload)
+        const updatedGame = { ...game, ...updatePayload, id: gameId, code: gameId }
         io.to(gameId).emit('playerLeft', { playerId: playerUid, players })
-        io.to(gameId).emit('gameUpdate', { game: { ...game, players } })
+        io.to(gameId).emit('gameUpdate', { game: updatedGame })
+        if (nextHostId && nextHostId !== game.hostId) {
+          io.to(gameId).emit('hostChanged', { hostId: nextHostId })
+        }
       }
 
       // Sacar al socket de la room

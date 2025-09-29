@@ -287,11 +287,58 @@ export const useSocket = () => {
         return
       }
 
+      let settled = false
+      const timeoutId = setTimeout(() => {
+        if (settled) return
+        settled = true
+        // Resolver sin error; el servidor puede responder vía evento 'answerResult'
+        resolve({ timeout: true })
+      }, 8000)
+
       socketManager.submitAnswer(gameId, questionIndex, answer, (response) => {
-        if (response.success) {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        if (response?.success) {
+          resolve(response.data)
+        } else if (response) {
+          // Si hay respuesta negativa, igual resolvemos y confiamos en eventos posteriores
+          resolve({ error: response.error })
+        } else {
+          resolve(null)
+        }
+      })
+    })
+  }, [connected])
+
+  const requestQuestion = useCallback((gameId, questionIndex) => {
+    return new Promise((resolve, reject) => {
+      if (!connected) {
+        reject(new Error('Socket not connected'))
+        return
+      }
+
+      socketManager.requestQuestion(gameId, questionIndex, (response) => {
+        if (response?.success) {
           resolve(response.data)
         } else {
-          reject(new Error(response.error || 'Failed to submit answer'))
+          reject(new Error(response?.error || 'Failed to request question'))
+        }
+      })
+    })
+  }, [connected])
+
+  const requestRemainingTime = useCallback((gameId, questionIndex) => {
+    return new Promise((resolve) => {
+      if (!connected) {
+        resolve(null)
+        return
+      }
+      socketManager.requestRemainingTime(gameId, questionIndex, (response) => {
+        if (response?.success) {
+          resolve(response.data?.remainingMs || null)
+        } else {
+          resolve(null)
         }
       })
     })
@@ -315,6 +362,8 @@ export const useSocket = () => {
     leaveGame,
     startGame,
     submitAnswer,
+    requestQuestion,
+    requestRemainingTime,
 
     // Utilidades
     isConnected: () => socketManager.isConnected(),

@@ -63,7 +63,7 @@ export default function GameLobby({ gameId }) {
     }
   }
 
-  const codeToShow = currentGame?.code || currentGame?.id
+  const codeToShow = (currentGame?.code || currentGame?.id || gameId || '').toString()
 
   const handleCopyGameCode = () => {
     if (codeToShow) {
@@ -173,42 +173,40 @@ export default function GameLobby({ gameId }) {
           {/* Game info and controls */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Game code */}
-            {codeToShow && (
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Código de la Partida
-                </h2>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="text-center p-4 bg-gray-50 rounded-xl">
-                      <div className="text-3xl font-bold text-brand tracking-wider">
-                        {codeToShow}
-                      </div>
-                      <p className="text-sm text-gray-600 mt-2">
-                        Comparte este código para que otros se unan
-                      </p>
+            {/* Game code (siempre visible) */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Código de la Partida
+              </h2>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-center p-4 bg-gray-50 rounded-xl">
+                    <div className="text-3xl font-bold text-brand tracking-wider">
+                      {codeToShow || '—'}
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={handleCopyGameCode}
-                      className="p-2 text-gray-600 hover:text-brand border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                      title="Copiar código"
-                    >
-                      <CopyIcon size={20} />
-                    </button>
-                    <button
-                      onClick={handleShareGame}
-                      className="p-2 text-gray-600 hover:text-brand border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                      title="Compartir enlace"
-                    >
-                      <ShareIcon size={20} />
-                    </button>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Comparte este código para que otros se unan
+                    </p>
                   </div>
                 </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleCopyGameCode}
+                    className="p-2 text-gray-600 hover:text-brand border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    title="Copiar código"
+                  >
+                    <CopyIcon size={20} />
+                  </button>
+                  <button
+                    onClick={handleShareGame}
+                    className="p-2 text-gray-600 hover:text-brand border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    title="Compartir enlace"
+                  >
+                    <ShareIcon size={20} />
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Game settings */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -260,18 +258,14 @@ export default function GameLobby({ gameId }) {
               </div>
             )}
 
-            {/* Waiting message (for non-hosts) */}
+            {/* Mensaje informativo (sin estado de listo) */}
             {!isHost && (
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
                 <div className="flex items-center gap-4">
                   <ClockIcon size={24} className="text-blue-600" />
                   <div>
-                    <h3 className="font-semibold text-blue-900">
-                      Esperando al host
-                    </h3>
-                    <p className="text-blue-700 text-sm mt-1">
-                      El host iniciará la partida cuando todos estén listos
-                    </p>
+                    <h3 className="font-semibold text-blue-900">El anfitrión iniciará la partida</h3>
+                    <p className="text-blue-700 text-sm mt-1">Puedes invitar a más jugadores con el código.</p>
                   </div>
                 </div>
               </div>
@@ -301,10 +295,8 @@ export default function GameLobby({ gameId }) {
                   <div className="flex-1">
                     <div className="font-medium text-gray-900">
                       {player.username}
-                      {player.id === currentGame.host && (
-                        <span className="ml-2 text-xs bg-brand text-white px-2 py-1 rounded-full">
-                          HOST
-                        </span>
+                      {(player.id === currentGame.hostId || player.id === currentGame.host) && (
+                        <span className="ml-2 text-xs bg-brand text-white px-2 py-1 rounded-full">HOST</span>
                       )}
                     </div>
                     <div className="text-sm text-gray-500">

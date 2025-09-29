@@ -170,16 +170,27 @@ class SocketManager {
     return this.emit('startGame', { gameId }, callback)
   }
 
-  submitAnswer(gameId, questionIndex, answer, callback) {
-    return this.emit('submitAnswer', {
+  submitAnswer(gameId, _questionIndex, answer, callback) {
+    const payload = {
       gameId,
-      questionIndex,
-      answer
-    }, callback)
+      uid: answer?.uid,
+      // Backend soporta answerValue o answerIndex
+      answerValue: typeof answer?.value !== 'undefined' ? answer.value : undefined,
+      answerIndex: typeof answer?.index === 'number' ? answer.index : undefined
+    }
+    return this.emit('submitAnswer', payload, callback)
   }
 
   requestQuestion(gameId, questionIndex, callback) {
     return this.emit('requestQuestion', {
+      gameId,
+      questionIndex
+    }, callback)
+  }
+  
+  // Sincronización de tiempo restante (si el backend lo ofrece)
+  requestRemainingTime(gameId, questionIndex, callback) {
+    return this.emit('requestRemainingTime', {
       gameId,
       questionIndex
     }, callback)
