@@ -23,7 +23,9 @@ export default function PublicGamesList() {
       setError(null)
       
       const publicGames = await gamesAPI.getPublicGames()
-      setGames(publicGames || [])
+      // Filtrar partidas sin jugadores (0 players) si el backend ya las limpia
+      const cleaned = (publicGames || []).filter(g => Array.isArray(g.players) ? g.players.length > 0 : true)
+      setGames(cleaned)
     } catch (err) {
       console.warn('Failed to fetch public games:', err)
       setError('Error al cargar partidas')

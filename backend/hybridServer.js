@@ -137,6 +137,43 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Leave Game
+  socket.on('leaveGame', async ({ gameId, uid }) => {
+    try {
+      if (!gameId) {
+        socket.emit('error', { error: 'Missing gameId' })
+        return
+      }
+      const gameRef = db.collection('games').doc(gameId)
+      const gameDoc = await gameRef.get()
+      if (!gameDoc.exists) {
+        socket.emit('error', { error: 'Game not found' })
+        return
+      }
+      const game = gameDoc.data()
+      const playerUid = uid || socket.data?.uid
+      let players = Array.isArray(game.players) ? [...game.players] : []
+      if (playerUid) {
+        players = players.filter(p => p.uid !== playerUid)
+      }
+
+      if (players.length === 0) {
+        // No quedan jugadores: eliminar la sala
+        await gameRef.delete()
+        io.to(gameId).emit('playersUpdated', { players: [] })
+      } else {
+        await gameRef.update({ players })
+        io.to(gameId).emit('playerLeft', { playerId: playerUid, players })
+        io.to(gameId).emit('gameUpdate', { game: { ...game, players } })
+      }
+
+      // Sacar al socket de la room
+      try { socket.leave(gameId) } catch (e) {}
+    } catch (error) {
+      socket.emit('error', { error: error.message })
+    }
+  })
+
   // Start Game
   socket.on('startGame', async ({ gameId }) => {
     try {

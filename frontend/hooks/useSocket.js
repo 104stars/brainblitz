@@ -246,14 +246,14 @@ export const useSocket = () => {
     })
   }, [connected])
 
-  const leaveGame = useCallback((gameId) => {
+  const leaveGame = useCallback((gameId, userPayload) => {
     return new Promise((resolve, reject) => {
       if (!connected) {
         reject(new Error('Socket not connected'))
         return
       }
 
-      socketManager.leaveGame(gameId, (response) => {
+      socketManager.leaveGame(gameId, userPayload, (response) => {
         if (response.success) {
           resolve(response.data)
         } else {

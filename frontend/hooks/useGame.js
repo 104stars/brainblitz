@@ -75,12 +75,14 @@ export const useGame = () => {
     // Listener: Jugador salió
     const handlePlayerLeft = (data) => {
       console.log('Player left:', data)
-      removePlayer(data.playerId)
-      
-      // Mostrar notificación opcional
-      const player = getPlayerById(data.playerId)
-      if (player) {
-        console.log(`${player.username} salió de la partida`)
+      if (Array.isArray(data?.players)) {
+        setPlayers(data.players.map(normalizePlayer))
+      } else if (data?.playerId) {
+        removePlayer(data.playerId)
+        const player = getPlayerById(data.playerId)
+        if (player) {
+          console.log(`${player.username} salió de la partida`)
+        }
       }
     }
 
@@ -140,6 +142,12 @@ export const useGame = () => {
     // Registrar listeners
     const removePlayerJoined = on('playerJoined', handlePlayerJoined)
     const removePlayerLeft = on('playerLeft', handlePlayerLeft)
+    // Algunos backends emiten 'playersUpdated' en lugar de playerLeft/joined
+    const removePlayersUpdated = on('playersUpdated', (payload) => {
+      if (Array.isArray(payload?.players)) {
+        setPlayers(payload.players.map(normalizePlayer))
+      }
+    })
     const removeGameStarted = on('gameStarted', handleGameStarted)
     const removeNewQuestion = on('newQuestion', handleNewQuestion)
     const removeAnswerResult = on('answerResult', handleAnswerResult)
@@ -151,6 +159,7 @@ export const useGame = () => {
     return () => {
       removePlayerJoined()
       removePlayerLeft()
+      removePlayersUpdated()
       removeGameStarted()
       removeNewQuestion()
       removeAnswerResult()
@@ -278,7 +287,7 @@ export const useGame = () => {
       if (connected && gameId) {
         // No bloquear si el backend no envía ACK: usar timeout corto
         const ackOrTimeout = Promise.race([
-          socketLeaveGame(gameId),
+          socketLeaveGame(gameId, { uid: user?.uid }),
           new Promise((resolve) => setTimeout(resolve, 800))
         ])
         await ackOrTimeout

@@ -156,8 +156,14 @@ class SocketManager {
     return this.emit('joinGame', { gameId, ...userPayload }, callback)
   }
 
-  leaveGame(gameId, callback) {
-    return this.emit('leaveGame', { gameId }, callback)
+  leaveGame(gameId, payloadOrCallback, maybeCb) {
+    // Soportar leaveGame(gameId, { uid }, cb) o leaveGame(gameId, cb)
+    if (typeof payloadOrCallback === 'function') {
+      return this.emit('leaveGame', { gameId }, payloadOrCallback)
+    }
+    const callback = maybeCb
+    const payload = payloadOrCallback || {}
+    return this.emit('leaveGame', { gameId, ...payload }, callback)
   }
 
   startGame(gameId, callback) {
